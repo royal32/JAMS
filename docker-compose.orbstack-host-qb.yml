@@ -1,0 +1,7 @@
+services:
+  qbittorrent:
+    # Use this override when qBittorrent runs natively on the macOS host.
+    # The service remains defined in the base compose file, but assigning it a
+    # non-default profile keeps it from starting unless explicitly requested.
+    profiles:
+      - container-qbittorrent

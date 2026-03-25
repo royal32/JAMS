@@ -6,11 +6,11 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Asia/Kuala_Lumpur
+      - TZ=${TZ:-Asia/Kuala_Lumpur}
     volumes:
       - ./jellyfin/config:/config
       - ./jellyfin/cache:/cache
-      - /mnt/ssd/jellyfin/media:/media
+      - ${MEDIA_ROOT:-/mnt/ssd/jellyfin/media}:/media
     ports:
       - 8096:8096
     networks:
@@ -26,7 +26,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Asia/Kuala_Lumpur
+      - TZ=${TZ:-Asia/Kuala_Lumpur}
     volumes:
       - ./prowlarr:/config
     ports:
@@ -44,11 +44,11 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Asia/Kuala_Lumpur
+      - TZ=${TZ:-Asia/Kuala_Lumpur}
     volumes:
       - ./radarr:/config
-      - /mnt/ssd/jellyfin/media:/media
-      - /mnt/ssd/jellyfin/media/downloads:/downloads
+      - ${MEDIA_ROOT:-/mnt/ssd/jellyfin/media}:/media
+      - ${DOWNLOADS_ROOT:-/mnt/ssd/jellyfin/media/downloads}:/downloads
     ports:
       - 7878:7878
     networks:
@@ -64,11 +64,11 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Asia/Kuala_Lumpur
+      - TZ=${TZ:-Asia/Kuala_Lumpur}
     volumes:
       - ./sonarr:/config
-      - /mnt/ssd/jellyfin/media:/media
-      - /mnt/ssd/jellyfin/media/downloads:/downloads
+      - ${MEDIA_ROOT:-/mnt/ssd/jellyfin/media}:/media
+      - ${DOWNLOADS_ROOT:-/mnt/ssd/jellyfin/media/downloads}:/downloads
     ports:
       - 8989:8989
     networks:
@@ -84,11 +84,11 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Asia/Kuala_Lumpur
+      - TZ=${TZ:-Asia/Kuala_Lumpur}
       - WEBUI_PORT=8080
     volumes:
       - ./qbittorrent:/config
-      - /mnt/ssd/jellyfin/media/downloads:/downloads
+      - ${DOWNLOADS_ROOT:-/mnt/ssd/jellyfin/media/downloads}:/downloads
     ports:
       - 8080:8080
       - 6881:6881
@@ -106,10 +106,10 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Asia/Kuala_Lumpur
+      - TZ=${TZ:-Asia/Kuala_Lumpur}
     volumes:
       - ./bazarr:/config
-      - /mnt/ssd/jellyfin/media:/media
+      - ${MEDIA_ROOT:-/mnt/ssd/jellyfin/media}:/media
     ports:
       - 6767:6767
     networks:
@@ -123,7 +123,7 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     environment:
-      - TZ=Asia/Kuala_Lumpur
+      - TZ=${TZ:-Asia/Kuala_Lumpur}
     volumes:
       - ./seerr:/app/config
     ports:
@@ -140,7 +140,7 @@ services:
       - 1.1.1.1
     environment:
       - LOG_LEVEL=info
-      - TZ=Asia/Kuala_Lumpur
+      - TZ=${TZ:-Asia/Kuala_Lumpur}
     ports:
       - 8191:8191
     networks:

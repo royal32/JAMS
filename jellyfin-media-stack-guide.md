@@ -95,6 +95,23 @@ docker logs qbittorrent | grep password
 4. Tools -> Options -> Downloads -> set Default Save Path to `/downloads`
 5. Save
 
+### OrbStack + native macOS qBittorrent
+
+If qBittorrent runs as a normal macOS app instead of this container:
+
+1. Copy `.env.example` to `.env`
+2. Set `MEDIA_ROOT` and `DOWNLOADS_ROOT` to real macOS paths, for example:
+```bash
+MEDIA_ROOT=/Users/YOUR_USER/Media/jellyfin
+DOWNLOADS_ROOT=/Users/YOUR_USER/Media/jellyfin/downloads
+```
+3. Start Compose with the override so the qBittorrent container is skipped:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.orbstack-host-qb.yml up -d
+```
+4. In the macOS qBittorrent app, enable the Web UI and set its save path to the same folder as `DOWNLOADS_ROOT`
+5. In Radarr/Sonarr, use `host.docker.internal` as the qBittorrent host
+
 ---
 
 ## Step 5: Configure Prowlarr — http://YOUR_IP:9696
@@ -141,11 +158,15 @@ For each: search by name -> select Base URL -> add flaresolverr tag if needed ->
    - Enable Rename Movies
    - Add Root Folder: `/media/Movies`
 2. Settings -> Download Clients -> + -> qBittorrent:
-   - Host: `qbittorrent`
+   - Host: `qbittorrent` for the container, or `host.docker.internal` for native macOS qBittorrent
    - Port: `8080`
    - Username: `admin` / Password: your password
    - Test -> Save
-3. Settings -> Indexers — verify indexers are listed
+3. If using native macOS qBittorrent, add Settings -> Download Clients -> Remote Path Mappings:
+   - Host: `host.docker.internal`
+   - Remote Path: your exact macOS qBittorrent download folder, for example `/Users/YOUR_USER/Media/jellyfin/downloads`
+   - Local Path: `/downloads`
+4. Settings -> Indexers — verify indexers are listed
 
 ---
 
@@ -155,10 +176,14 @@ For each: search by name -> select Base URL -> add flaresolverr tag if needed ->
    - Enable Rename Episodes
    - Add Root Folder: `/media/tv`
 2. Settings -> Download Clients -> + -> qBittorrent:
-   - Host: `qbittorrent`
+   - Host: `qbittorrent` for the container, or `host.docker.internal` for native macOS qBittorrent
    - Port: `8080`
    - Username: `admin` / Password: your password
    - Test -> Save
+3. If using native macOS qBittorrent, add Settings -> Download Clients -> Remote Path Mappings:
+   - Host: `host.docker.internal`
+   - Remote Path: your exact macOS qBittorrent download folder, for example `/Users/YOUR_USER/Media/jellyfin/downloads`
+   - Local Path: `/downloads`
 
 ---
 

@@ -25,6 +25,8 @@ docker restart seerr
 
 See the full guide in [jellyfin-media-stack-guide.md](./jellyfin-media-stack-guide.md) for complete configuration steps.
 
+For OrbStack on macOS, copy [.env.example](./.env.example) to `.env` and change `MEDIA_ROOT`, `DOWNLOADS_ROOT`, and `TZ` for that Mac before starting the stack.
+
 ---
 
 ## Services
@@ -103,6 +105,31 @@ When configuring services to talk to each other, always use container names:
 
 Use your actual server IP only when accessing from your browser.
 
+If qBittorrent is running natively on the Mac instead of in Docker, use `host.docker.internal` from Radarr/Sonarr instead of `qbittorrent`.
+
+---
+
+## OrbStack + Host qBittorrent
+
+If you want qBittorrent to stay outside Docker so it can bind to your VPN interface on macOS:
+
+1. Copy `.env.example` to `.env` and set `MEDIA_ROOT` and `DOWNLOADS_ROOT` to real macOS paths, for example `/Users/yourname/Media/jellyfin` and `/Users/yourname/Media/jellyfin/downloads`.
+2. Start the stack with the OrbStack override so the containerized qBittorrent service does not start:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.orbstack-host-qb.yml up -d
+```
+3. In the macOS qBittorrent app, enable the Web UI and set its download path to the same host folder as `DOWNLOADS_ROOT`.
+4. In Radarr and Sonarr, add qBittorrent with:
+   - Host: `host.docker.internal`
+   - Port: `8080`
+   - Username/password: your qBittorrent Web UI credentials
+5. Add a Remote Path Mapping in both Radarr and Sonarr:
+   - Host: `host.docker.internal`
+   - Remote Path: the exact macOS path used by qBittorrent, for example `/Users/yourname/Media/jellyfin/downloads`
+   - Local Path: `/downloads`
+
+Without that remote path mapping, Radarr/Sonarr can talk to qBittorrent but often cannot import completed downloads because qBittorrent reports a macOS path while the containers only see `/downloads`.
+
 ---
 
 ## Common Commands
@@ -148,6 +175,7 @@ docker network inspect media-stack_medianet
 | Seerr permission denied / restart loop | `sudo chown -R 1000:1000 ~/media-stack/seerr` then restart |
 | Radarr shows movies as missing (red) | Normal — check indexers synced and qBittorrent connected |
 | Radarr can't import downloaded file | Ensure `/downloads` is mounted in Radarr volumes |
+| Radarr/Sonarr can connect to qBittorrent but cannot import | Add Remote Path Mapping from the macOS download path to `/downloads` |
 | Prowlarr sync button stuck | `docker restart prowlarr` |
 | qBittorrent password unknown | `docker logs qbittorrent \| grep password` |
 | Container name conflict on recreate | `docker compose down --remove-orphans` first |
