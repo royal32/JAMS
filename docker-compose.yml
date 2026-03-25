@@ -4,8 +4,8 @@ services:
     image: jellyfin/jellyfin:latest
     container_name: jellyfin
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-Asia/Kuala_Lumpur}
     volumes:
       - ./jellyfin/config:/config
@@ -24,8 +24,8 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-Asia/Kuala_Lumpur}
     volumes:
       - ./prowlarr:/config
@@ -42,8 +42,8 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-Asia/Kuala_Lumpur}
     volumes:
       - ./radarr:/config
@@ -62,8 +62,8 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-Asia/Kuala_Lumpur}
     volumes:
       - ./sonarr:/config
@@ -82,8 +82,8 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-Asia/Kuala_Lumpur}
       - WEBUI_PORT=8080
     volumes:
@@ -104,8 +104,8 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-Asia/Kuala_Lumpur}
     volumes:
       - ./bazarr:/config

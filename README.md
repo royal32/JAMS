@@ -27,6 +27,10 @@ See the full guide in [jellyfin-media-stack-guide.md](./jellyfin-media-stack-gui
 
 For OrbStack on macOS, copy [.env.example](./.env.example) to `.env` and change `MEDIA_ROOT`, `DOWNLOADS_ROOT`, and `TZ` for that Mac before starting the stack.
 
+If `MEDIA_ROOT` points at an SMB-mounted path under `/Volumes`, set `PUID=0` and `PGID=0` in `.env` for the LinuxServer containers. That fixes basic UID/GID mismatches, but it does not solve the stricter Radarr/Sonarr root-folder validation on `smbfs`.
+
+If you want to preconfigure Radarr, Sonarr, and host qBittorrent after the containers come up, copy [bootstrap.env.example](./bootstrap.env.example) to `bootstrap.env`, set the qBittorrent credentials, then run `./scripts/bootstrap-servarr.sh`.
+
 ---
 
 ## Services
@@ -114,6 +118,7 @@ If qBittorrent is running natively on the Mac instead of in Docker, use `host.do
 If you want qBittorrent to stay outside Docker so it can bind to your VPN interface on macOS:
 
 1. Copy `.env.example` to `.env` and set `MEDIA_ROOT` and `DOWNLOADS_ROOT` to real macOS paths, for example `/Users/yourname/Media/jellyfin` and `/Users/yourname/Media/jellyfin/downloads`.
+   If those paths are on an SMB mount under `/Volumes`, also set `PUID=0` and `PGID=0`.
 2. Start the stack with the OrbStack override so the containerized qBittorrent service does not start:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.orbstack-host-qb.yml up -d
@@ -130,6 +135,23 @@ docker compose -f docker-compose.yml -f docker-compose.orbstack-host-qb.yml up -
    - Local Path: `/downloads`
 
 Without that remote path mapping, Radarr/Sonarr can talk to qBittorrent but often cannot import completed downloads because qBittorrent reports a macOS path while the containers only see `/downloads`.
+
+You can also automate the Radarr/Sonarr side of this by running:
+```bash
+cp bootstrap.env.example bootstrap.env
+./scripts/bootstrap-servarr.sh
+```
+
+That bootstrap script will:
+- create `Movies`, `tv`, and `downloads` under `MEDIA_ROOT`
+- set qBittorrent's default save path to `DOWNLOADS_ROOT`
+- add the Radarr and Sonarr root folders
+- add the qBittorrent download client in both apps
+- add the Remote Path Mapping in both apps
+
+It does not configure Prowlarr indexers, Bazarr subtitle providers, Jellyfin libraries, or Seerr sign-in. Those still need either credentials or interactive selections.
+
+Important: if `MEDIA_ROOT` is an SMB-mounted path under `/Volumes`, Radarr/Sonarr still reject it as a root folder in this setup even when the container process runs as `root`. Use a local Mac path for `MEDIA_ROOT`, or mount the SMB share directly inside Docker as a CIFS volume instead of bind-mounting `/Volumes/...`.
 
 ---
 

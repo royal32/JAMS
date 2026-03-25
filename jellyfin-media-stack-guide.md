@@ -102,9 +102,17 @@ If qBittorrent runs as a normal macOS app instead of this container:
 1. Copy `.env.example` to `.env`
 2. Set `MEDIA_ROOT` and `DOWNLOADS_ROOT` to real macOS paths, for example:
 ```bash
+PUID=1000
+PGID=1000
 MEDIA_ROOT=/Users/YOUR_USER/Media/jellyfin
 DOWNLOADS_ROOT=/Users/YOUR_USER/Media/jellyfin/downloads
 ```
+If the media path is an SMB mount under `/Volumes`, change that to:
+```bash
+PUID=0
+PGID=0
+```
+That fixes basic UID/GID mismatches, but it does not solve Radarr/Sonarr root-folder validation on `smbfs`. For SMB-backed libraries, use a local Mac path for `MEDIA_ROOT`, or mount the SMB share directly inside Docker as a CIFS volume instead of bind-mounting `/Volumes/...`.
 3. Start Compose with the override so the qBittorrent container is skipped:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.orbstack-host-qb.yml up -d
@@ -112,6 +120,28 @@ docker compose -f docker-compose.yml -f docker-compose.orbstack-host-qb.yml up -
 4. That override also adds `host.docker.internal` to Radarr and Sonarr, which some OrbStack setups need before those containers can reach the macOS host
 5. In the macOS qBittorrent app, enable the Web UI and set its save path to the same folder as `DOWNLOADS_ROOT`
 6. In Radarr/Sonarr, use `host.docker.internal` as the qBittorrent host
+
+### Optional bootstrap for Radarr + Sonarr + host qBittorrent
+
+If you want to skip most of the manual Radarr/Sonarr setup:
+
+1. Copy `bootstrap.env.example` to `bootstrap.env`
+2. Set `QBIT_USERNAME` and `QBIT_PASSWORD`
+3. Run:
+```bash
+./scripts/bootstrap-servarr.sh
+```
+
+That script:
+- creates the host `Movies`, `tv`, and `downloads` folders if they do not exist
+- sets qBittorrent's default save path to `DOWNLOADS_ROOT`
+- creates the `/media/Movies` and `/media/tv` root folders in Radarr/Sonarr
+- adds qBittorrent as the download client in both apps
+- adds the Remote Path Mapping from the macOS downloads path to `/downloads`
+
+After that, the Radarr and Sonarr steps below are mostly verification instead of manual data entry.
+
+If `MEDIA_ROOT` is on an SMB mount under `/Volumes`, the bootstrap script now stops early with a targeted error because Radarr/Sonarr reject `smbfs` root folders in this setup.
 
 ---
 
@@ -169,6 +199,8 @@ For each: search by name -> select Base URL -> add flaresolverr tag if needed ->
    - Local Path: `/downloads`
 4. Settings -> Indexers — verify indexers are listed
 
+If you ran `./scripts/bootstrap-servarr.sh`, the root folder, qBittorrent client, and Remote Path Mapping should already exist here.
+
 ---
 
 ## Step 7: Configure Sonarr — http://YOUR_IP:8989
@@ -185,6 +217,8 @@ For each: search by name -> select Base URL -> add flaresolverr tag if needed ->
    - Host: `host.docker.internal`
    - Remote Path: your exact macOS qBittorrent download folder, for example `/Users/YOUR_USER/Media/jellyfin/downloads`
    - Local Path: `/downloads`
+
+If you ran `./scripts/bootstrap-servarr.sh`, the root folder, qBittorrent client, and Remote Path Mapping should already exist here.
 
 ---
 
