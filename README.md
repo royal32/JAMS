@@ -148,6 +148,8 @@ That bootstrap script will:
 - add the Radarr and Sonarr root folders
 - add the qBittorrent download client in both apps
 - add the Remote Path Mapping in both apps
+- add Prowlarr app connections for Radarr and Sonarr
+- add a FlareSolverr proxy in Prowlarr
 
 It does not configure Prowlarr indexers, Bazarr subtitle providers, Jellyfin libraries, or Seerr sign-in. Those still need either credentials or interactive selections.
 

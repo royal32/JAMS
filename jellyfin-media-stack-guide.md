@@ -138,6 +138,8 @@ That script:
 - creates the `/media/Movies` and `/media/tv` root folders in Radarr/Sonarr
 - adds qBittorrent as the download client in both apps
 - adds the Remote Path Mapping from the macOS downloads path to `/downloads`
+- adds Radarr and Sonarr as Prowlarr apps
+- adds a FlareSolverr proxy in Prowlarr
 
 After that, the Radarr and Sonarr steps below are mostly verification instead of manual data entry.
 
@@ -180,6 +182,8 @@ For each: search by name -> select Base URL -> add flaresolverr tag if needed ->
    - API Key: from Sonarr -> Settings -> General -> Security
    - Test -> Save
 3. Click Sync App Indexers
+
+If you ran `./scripts/bootstrap-servarr.sh`, the Radarr and Sonarr app connections should already exist in Prowlarr, and FlareSolverr should already be present as a proxy. You still need to add your actual indexers, then click `Sync App Indexers`.
 
 ---
 

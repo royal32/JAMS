@@ -46,6 +46,7 @@ QBIT_PASSWORD="${QBIT_PASSWORD:-}"
 
 RADARR_URL="${RADARR_URL:-http://127.0.0.1:7878}"
 SONARR_URL="${SONARR_URL:-http://127.0.0.1:8989}"
+PROWLARR_URL="${PROWLARR_URL:-http://127.0.0.1:9696}"
 
 RADARR_QBIT_HOST="${RADARR_QBIT_HOST:-host.docker.internal}"
 SONARR_QBIT_HOST="${SONARR_QBIT_HOST:-host.docker.internal}"
@@ -64,6 +65,17 @@ SONARR_LOCAL_PATH="${SONARR_LOCAL_PATH:-/downloads}"
 
 RADARR_CONFIG_PATH="${RADARR_CONFIG_PATH:-${ROOT_DIR}/radarr/config.xml}"
 SONARR_CONFIG_PATH="${SONARR_CONFIG_PATH:-${ROOT_DIR}/sonarr/config.xml}"
+PROWLARR_CONFIG_PATH="${PROWLARR_CONFIG_PATH:-${ROOT_DIR}/prowlarr/config.xml}"
+
+PROWLARR_ENABLE="${PROWLARR_ENABLE:-true}"
+PROWLARR_SERVER_URL_FOR_APPS="${PROWLARR_SERVER_URL_FOR_APPS:-http://prowlarr:9696}"
+PROWLARR_RADARR_NAME="${PROWLARR_RADARR_NAME:-Radarr}"
+PROWLARR_SONARR_NAME="${PROWLARR_SONARR_NAME:-Sonarr}"
+PROWLARR_RADARR_BASE_URL="${PROWLARR_RADARR_BASE_URL:-http://radarr:7878}"
+PROWLARR_SONARR_BASE_URL="${PROWLARR_SONARR_BASE_URL:-http://sonarr:8989}"
+PROWLARR_ENABLE_FLARESOLVERR="${PROWLARR_ENABLE_FLARESOLVERR:-true}"
+PROWLARR_FLARESOLVERR_NAME="${PROWLARR_FLARESOLVERR_NAME:-FlareSolverr}"
+PROWLARR_FLARESOLVERR_URL="${PROWLARR_FLARESOLVERR_URL:-http://flaresolverr:8191}"
 
 [[ -n "$QBIT_USERNAME" ]] || fail "Set QBIT_USERNAME in bootstrap.env"
 [[ -n "$QBIT_PASSWORD" ]] || fail "Set QBIT_PASSWORD in bootstrap.env"
@@ -99,6 +111,25 @@ wait_for_servarr() {
   until curl -fsS \
     -H "X-Api-Key: ${api_key}" \
     "${base_url}/api/v3/system/status" >/dev/null 2>&1; do
+    if (( "$(date +%s)" - started_at >= BOOTSTRAP_TIMEOUT_SECONDS )); then
+      fail "Timed out waiting for ${label} at ${base_url}"
+    fi
+    sleep 2
+  done
+}
+
+wait_for_api() {
+  local label="$1"
+  local base_url="$2"
+  local header_name="$3"
+  local header_value="$4"
+  local path="$5"
+  local started_at
+  started_at="$(date +%s)"
+
+  until curl -fsS \
+    -H "${header_name}: ${header_value}" \
+    "${base_url}${path}" >/dev/null 2>&1; do
     if (( "$(date +%s)" - started_at >= BOOTSTRAP_TIMEOUT_SECONDS )); then
       fail "Timed out waiting for ${label} at ${base_url}"
     fi
@@ -238,14 +269,27 @@ ensure_remote_path_mapping() {
   local remote_path="$5"
   local local_path="$6"
   local mappings
+  local existing_mapping
 
   mappings="$(servarr_api GET "$base_url" "$api_key" "/api/v3/remotepathmapping")"
-  if jq -e \
+  existing_mapping="$(
+    jq -c \
     --arg host "$host" \
     --arg remote_path "$remote_path" \
     --arg local_path "$local_path" \
-    '.[] | select(.host == $host and .remotePath == $remote_path and .localPath == $local_path)' \
-    <<<"$mappings" >/dev/null; then
+    '
+    def normalize_path: tostring | sub("/+$"; "");
+    map(
+      select(
+        .host == $host and
+        ((.remotePath | normalize_path) == ($remote_path | normalize_path)) and
+        ((.localPath | normalize_path) == ($local_path | normalize_path))
+      )
+    ) | first // empty
+    ' <<<"$mappings"
+  )"
+
+  if [[ -n "$existing_mapping" ]]; then
     log "${label}: remote path mapping already present"
     return
   fi
@@ -334,6 +378,114 @@ ensure_qbit_download_client() {
   log "${label}: ensured qBittorrent download client ${client_name}"
 }
 
+ensure_prowlarr_application() {
+  local label="$1"
+  local app_name="$2"
+  local implementation="$3"
+  local base_url="$4"
+  local app_api_key="$5"
+  local applications
+  local payload
+  local method
+
+  applications="$(servarr_api GET "$PROWLARR_URL" "$PROWLARR_API_KEY" "/api/v1/applications")"
+  payload="$(
+    jq -c \
+      --arg implementation "$implementation" \
+      --arg app_name "$app_name" \
+      'map(select(.implementation == $implementation or .name == $app_name)) | first // empty' \
+      <<<"$applications"
+  )"
+
+  if [[ -n "$payload" ]]; then
+    method="PUT"
+  else
+    payload="$(
+      servarr_api GET "$PROWLARR_URL" "$PROWLARR_API_KEY" "/api/v1/applications/schema" |
+        jq -c \
+          --arg implementation "$implementation" \
+          'map(select(.implementation == $implementation)) | first // empty'
+    )"
+    [[ -n "$payload" ]] || fail "${label}: could not find ${implementation} schema in Prowlarr"
+    method="POST"
+  fi
+
+  payload="$(
+    jq -c \
+      --arg app_name "$app_name" \
+      --arg prowlarr_url "$PROWLARR_SERVER_URL_FOR_APPS" \
+      --arg base_url "$base_url" \
+      --arg api_key "$app_api_key" \
+      '
+      def upsert_field($name; $value):
+        .fields = (.fields // [])
+        | if ([.fields[]? | select(.name == $name)] | length) > 0 then
+            .fields |= map(if .name == $name then .value = $value else . end)
+          else
+            .fields += [{"name": $name, "value": $value}]
+          end;
+
+      .
+      | .enable = true
+      | .name = $app_name
+      | upsert_field("prowlarrUrl"; $prowlarr_url)
+      | upsert_field("baseUrl"; $base_url)
+      | upsert_field("apiKey"; $api_key)
+      ' <<<"$payload"
+  )"
+
+  servarr_api "$method" "$PROWLARR_URL" "$PROWLARR_API_KEY" "/api/v1/applications" "$payload" >/dev/null
+  log "${label}: ensured Prowlarr application ${app_name}"
+}
+
+ensure_prowlarr_flaresolverr_proxy() {
+  local proxies
+  local payload
+  local method
+
+  proxies="$(servarr_api GET "$PROWLARR_URL" "$PROWLARR_API_KEY" "/api/v1/indexerProxy")"
+  payload="$(
+    jq -c \
+      --arg implementation "FlareSolverr" \
+      --arg proxy_name "$PROWLARR_FLARESOLVERR_NAME" \
+      'map(select(.implementation == $implementation or .name == $proxy_name)) | first // empty' \
+      <<<"$proxies"
+  )"
+
+  if [[ -n "$payload" ]]; then
+    method="PUT"
+  else
+    payload="$(
+      servarr_api GET "$PROWLARR_URL" "$PROWLARR_API_KEY" "/api/v1/indexerProxy/schema" |
+        jq -c 'map(select(.implementation == "FlareSolverr")) | first // empty'
+    )"
+    [[ -n "$payload" ]] || fail "Prowlarr: could not find FlareSolverr schema"
+    method="POST"
+  fi
+
+  payload="$(
+    jq -c \
+      --arg proxy_name "$PROWLARR_FLARESOLVERR_NAME" \
+      --arg host "$PROWLARR_FLARESOLVERR_URL" \
+      '
+      def upsert_field($name; $value):
+        .fields = (.fields // [])
+        | if ([.fields[]? | select(.name == $name)] | length) > 0 then
+            .fields |= map(if .name == $name then .value = $value else . end)
+          else
+            .fields += [{"name": $name, "value": $value}]
+          end;
+
+      .
+      | .name = $proxy_name
+      | upsert_field("host"; $host)
+      ' <<<"$payload"
+  )"
+
+  servarr_api "$method" "$PROWLARR_URL" "$PROWLARR_API_KEY" "/api/v1/indexerProxy" "$payload" >/dev/null
+  log "Prowlarr: ensured FlareSolverr proxy ${PROWLARR_FLARESOLVERR_NAME}"
+}
+
 log "Creating shared media folders"
 mkdir -p "${MEDIA_ROOT}" "${MEDIA_ROOT}/Movies" "${MEDIA_ROOT}/tv" "$DOWNLOADS_ROOT"
 ensure_directory_mode "${MEDIA_ROOT}"
@@ -349,16 +501,29 @@ fi
 
 wait_for_file "Radarr config" "$RADARR_CONFIG_PATH"
 wait_for_file "Sonarr config" "$SONARR_CONFIG_PATH"
+if [[ "$PROWLARR_ENABLE" == "true" ]]; then
+  wait_for_file "Prowlarr config" "$PROWLARR_CONFIG_PATH"
+fi
 
 RADARR_API_KEY="$(extract_api_key "$RADARR_CONFIG_PATH")"
 SONARR_API_KEY="$(extract_api_key "$SONARR_CONFIG_PATH")"
+if [[ "$PROWLARR_ENABLE" == "true" ]]; then
+  PROWLARR_API_KEY="$(extract_api_key "$PROWLARR_CONFIG_PATH")"
+fi
 
 [[ -n "$RADARR_API_KEY" ]] || fail "Could not extract Radarr API key from ${RADARR_CONFIG_PATH}"
 [[ -n "$SONARR_API_KEY" ]] || fail "Could not extract Sonarr API key from ${SONARR_CONFIG_PATH}"
+if [[ "$PROWLARR_ENABLE" == "true" ]]; then
+  [[ -n "$PROWLARR_API_KEY" ]] || fail "Could not extract Prowlarr API key from ${PROWLARR_CONFIG_PATH}"
+fi
 
 log "Waiting for Radarr and Sonarr APIs"
 wait_for_servarr "Radarr" "$RADARR_URL" "$RADARR_API_KEY"
 wait_for_servarr "Sonarr" "$SONARR_URL" "$SONARR_API_KEY"
+if [[ "$PROWLARR_ENABLE" == "true" ]]; then
+  log "Waiting for Prowlarr API"
+  wait_for_api "Prowlarr" "$PROWLARR_URL" "X-Api-Key" "$PROWLARR_API_KEY" "/api/v1/system/status"
+fi
 
 qbit_cookie_jar="$(mktemp)"
 trap 'rm -f "$qbit_cookie_jar"' EXIT
@@ -380,5 +545,14 @@ log "Configuring Sonarr"
 ensure_root_folder "Sonarr" "$SONARR_URL" "$SONARR_API_KEY" "$SONARR_ROOT_FOLDER"
 ensure_remote_path_mapping "Sonarr" "$SONARR_URL" "$SONARR_API_KEY" "$SONARR_QBIT_HOST" "$SONARR_REMOTE_PATH" "$SONARR_LOCAL_PATH"
 ensure_qbit_download_client "Sonarr" "$SONARR_URL" "$SONARR_API_KEY" "$SONARR_DOWNLOAD_CLIENT_NAME" "$SONARR_QBIT_HOST" "$SONARR_QBIT_PORT"
+
+if [[ "$PROWLARR_ENABLE" == "true" ]]; then
+  log "Configuring Prowlarr"
+  if [[ "$PROWLARR_ENABLE_FLARESOLVERR" == "true" ]]; then
+    ensure_prowlarr_flaresolverr_proxy
+  fi
+  ensure_prowlarr_application "Prowlarr" "$PROWLARR_RADARR_NAME" "Radarr" "$PROWLARR_RADARR_BASE_URL" "$RADARR_API_KEY"
+  ensure_prowlarr_application "Prowlarr" "$PROWLARR_SONARR_NAME" "Sonarr" "$PROWLARR_SONARR_BASE_URL" "$SONARR_API_KEY"
+fi
 
 log "Bootstrap complete"
