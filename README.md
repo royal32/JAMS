@@ -118,12 +118,13 @@ If you want qBittorrent to stay outside Docker so it can bind to your VPN interf
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.orbstack-host-qb.yml up -d
 ```
-3. In the macOS qBittorrent app, enable the Web UI and set its download path to the same host folder as `DOWNLOADS_ROOT`.
-4. In Radarr and Sonarr, add qBittorrent with:
+3. That override also adds `host.docker.internal` to Radarr and Sonarr, which some OrbStack setups need before those containers can reach the macOS host.
+4. In the macOS qBittorrent app, enable the Web UI and set its download path to the same host folder as `DOWNLOADS_ROOT`.
+5. In Radarr and Sonarr, add qBittorrent with:
    - Host: `host.docker.internal`
    - Port: `8080`
    - Username/password: your qBittorrent Web UI credentials
-5. Add a Remote Path Mapping in both Radarr and Sonarr:
+6. Add a Remote Path Mapping in both Radarr and Sonarr:
    - Host: `host.docker.internal`
    - Remote Path: the exact macOS path used by qBittorrent, for example `/Users/yourname/Media/jellyfin/downloads`
    - Local Path: `/downloads`

@@ -109,8 +109,9 @@ DOWNLOADS_ROOT=/Users/YOUR_USER/Media/jellyfin/downloads
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.orbstack-host-qb.yml up -d
 ```
-4. In the macOS qBittorrent app, enable the Web UI and set its save path to the same folder as `DOWNLOADS_ROOT`
-5. In Radarr/Sonarr, use `host.docker.internal` as the qBittorrent host
+4. That override also adds `host.docker.internal` to Radarr and Sonarr, which some OrbStack setups need before those containers can reach the macOS host
+5. In the macOS qBittorrent app, enable the Web UI and set its save path to the same folder as `DOWNLOADS_ROOT`
+6. In Radarr/Sonarr, use `host.docker.internal` as the qBittorrent host
 
 ---
 
